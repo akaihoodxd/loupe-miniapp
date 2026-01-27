@@ -1,10 +1,26 @@
 import { useState } from "react";
-import { Search, Shield, TrendingUp, Eye, CheckCircle } from "lucide-react";
+import { Search, Shield, TrendingUp, Eye, CheckCircle, MoreVertical, Edit2, Trash2, PinOff } from "lucide-react";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import { DetailedCounterpartyCard } from "@/app/components/DetailedCounterpartyCard";
 import { Tabs, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import { parseSearchQuery, getSearchTypeLabel } from "@/app/utils/counterpartySearch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/app/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/app/components/ui/alert-dialog";
 
 interface CounterpartyData {
   uid: string;
@@ -45,24 +61,75 @@ export function Home() {
       teamName: "Pro Traders",
       text: "Кто сейчас на HTX с нормальным курсом?",
       createdAt: "18:10",
+      isPinned: false,
     },
     {
       id: "m2",
-      userId: "U-54120",
-      username: "@risk_hunter",
-      teamId: "T-05",
-      teamName: "Loupe Community",
-      text: "Если контрагент просит 3+ карты — почти всегда риск.",
+      userId: currentUser.userId,
+      username: currentUser.username,
+      teamId: currentUser.teamId,
+      teamName: currentUser.teamName,
+      text: "Тестим общий чат. Дальше подключим API и БД 🙂",
       createdAt: "18:12",
+      isPinned: false,
     },
   ]);
-  
-  // Today's stats
-  const todayStats = {
-    checks: 47,
-    deals: 23,
-    risks: 5,
+
+  const [editingGlobalId, setEditingGlobalId] = useState<string | null>(null);
+  const [editedGlobalText, setEditedGlobalText] = useState("");
+  const [deleteGlobalId, setDeleteGlobalId] = useState<string | null>(null);
+
+  const sendGlobalMessage = () => {
+    const text = globalMessage.trim();
+    if (!text) return;
+
+    setGlobalMessages((prev) => [
+      ...prev,
+      {
+        id: `m-${Date.now()}`,
+        userId: currentUser.userId,
+        username: currentUser.username,
+        teamId: currentUser.teamId,
+        teamName: currentUser.teamName,
+        text,
+        createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isPinned: false,
+      },
+    ]);
+    setGlobalMessage("");
   };
+
+  const startEditGlobal = (id: string, text: string) => {
+    setEditingGlobalId(id);
+    setEditedGlobalText(text);
+  };
+
+  const saveEditGlobal = () => {
+    if (!editingGlobalId) return;
+    const text = editedGlobalText.trim();
+    if (!text) return;
+
+    setGlobalMessages((prev) =>
+      prev.map((m) => (m.id === editingGlobalId ? { ...m, text } : m)),
+    );
+    setEditingGlobalId(null);
+    setEditedGlobalText("");
+  };
+
+  const cancelEditGlobal = () => {
+    setEditingGlobalId(null);
+    setEditedGlobalText("");
+  };
+
+  const deleteGlobalMessage = (id: string) => {
+    setGlobalMessages((prev) => prev.filter((m) => m.id !== id));
+    setDeleteGlobalId(null);
+  };
+
+  const unpinGlobalMessage = (id: string) => {
+    setGlobalMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPinned: false } : m)));
+  };
+
 
   const handleCheck = async () => {
     if (!searchQuery.trim()) return;
@@ -258,11 +325,11 @@ export function Home() {
           borderColor: "var(--glass-border)",
         }}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <h2 className="text-lg md:text-xl font-bold">Общий чат трейдеров</h2>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Видно всем пользователям • ник • команда • ID
+              Виден всем пользователям • ник • команда • ID
             </p>
           </div>
         </div>
@@ -271,23 +338,96 @@ export function Home() {
           className="rounded-xl border p-3 md:p-4 space-y-3 max-h-64 overflow-y-auto"
           style={{ borderColor: "var(--border)", background: "var(--card)" }}
         >
-          {globalMessages.map((m: any) => (
-            <div key={m.id} className="text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-semibold truncate">
-                  <span className="text-[var(--color-primary)]">{m.username}</span>{" "}
-                  <span className="text-muted-foreground">
-                    • {m.teamName} • {m.userId}
-                  </span>
+          {globalMessages.map((m) => {
+            const isMine = m.userId === currentUser.userId;
+            const isEditing = editingGlobalId === m.id;
+
+            return (
+              <div key={m.id} className="text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold leading-tight">
+                      <span className="text-[var(--color-primary)]">{m.username}</span>{" "}
+                      <span className="text-muted-foreground font-medium">
+                        • {m.teamName} • {m.userId}
+                      </span>
+                      {m.isPinned && (
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full border"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          закреплено
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-xs text-muted-foreground">{m.createdAt}</div>
+
+                    {isMine && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="h-8 w-8 rounded-lg border flex items-center justify-center"
+                            style={{ borderColor: "var(--border)", background: "var(--muted)" }}
+                            aria-label="Действия"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => startEditGlobal(m.id, m.text)}>
+                            <Edit2 className="w-4 h-4 mr-2" />
+                            Редактировать
+                          </DropdownMenuItem>
+
+                          {m.isPinned && (
+                            <DropdownMenuItem onClick={() => unpinGlobalMessage(m.id)}>
+                              <PinOff className="w-4 h-4 mr-2" />
+                              Открепить
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuItem
+                            onClick={() => setDeleteGlobalId(m.id)}
+                            className="text-[var(--destructive)]"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Удалить
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground shrink-0">{m.createdAt}</div>
+
+                <div className="mt-2">
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={editedGlobalText}
+                        onChange={(e) => setEditedGlobalText(e.target.value)}
+                        className="text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={saveEditGlobal}>
+                          Сохранить
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={cancelEditGlobal}>
+                          Отмена
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-foreground">{m.text}</div>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 text-foreground break-words">{m.text}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="flex gap-2 md:gap-3 mt-4">
+        <div className="flex gap-2 mt-3">
           <Input
             placeholder="Написать в общий чат..."
             value={globalMessage}
@@ -297,12 +437,31 @@ export function Home() {
           />
           <Button
             onClick={sendGlobalMessage}
-            className="px-4 md:px-6"
             style={{ background: "var(--gradient-primary)", color: "var(--primary-foreground)" }}
           >
             Отправить
           </Button>
         </div>
+
+        <AlertDialog open={!!deleteGlobalId} onOpenChange={(open) => !open && setDeleteGlobalId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Удалить сообщение?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Это действие нельзя отменить.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Отмена</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteGlobalId && deleteGlobalMessage(deleteGlobalId)}
+                style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}
+              >
+                Удалить
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

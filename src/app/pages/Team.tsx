@@ -138,10 +138,10 @@ export function Team() {
     setNewMessage("");
   };
 
-  const handlePinMessage = (id: string) => {
-    setTeamMessages(teamMessages.map(msg => 
-      msg.id === id ? { ...msg, isPinned: !msg.isPinned } : msg
-    ));
+  const handleUnpinMessage = (id: string) => {
+    setTeamMessages((prev) =>
+      prev.map((msg) => (msg.id === id ? { ...msg, isPinned: false } : msg)),
+    );
   };
 
   const handleEditMessage = (message: Message) => {
@@ -373,35 +373,39 @@ export function Team() {
                       <p className="text-xs text-muted-foreground mt-1">{msg.timestamp}</p>
 
                       {msg.isFromMe && !editingMessage && (
-                        <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handlePinMessage(msg.id)}
-                          >
-                            {msg.isPinned ? (
-                              <PinOff className="w-3 h-3" />
-                            ) : (
-                              <Pin className="w-3 h-3" />
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handleEditMessage(msg)}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                            onClick={() => openDeleteDialog("message", msg.id)}
-                          >
-                            <Trash2 className="w-3 h-3 text-[var(--destructive)]" />
-                          </Button>
+                        <div className="absolute top-2 right-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="h-8 w-8 rounded-lg border flex items-center justify-center"
+                                style={{ borderColor: "var(--border)", background: "rgba(0,0,0,0.15)" }}
+                                aria-label="Действия"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditMessage(msg)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Редактировать
+                              </DropdownMenuItem>
+
+                              {msg.isPinned && (
+                                <DropdownMenuItem onClick={() => handleUnpinMessage(msg.id)}>
+                                  <PinOff className="w-4 h-4 mr-2" />
+                                  Открепить
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuItem
+                                onClick={() => openDeleteDialog("message", msg.id)}
+                                className="text-[var(--destructive)]"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Удалить
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       )}
                     </div>

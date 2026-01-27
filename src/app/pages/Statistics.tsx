@@ -1,8 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -12,6 +10,21 @@ import {
   Clock,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/app/components/ui/drawer";
+import { Button } from "@/app/components/ui/button";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  BarChart,
+  Bar,
+} from "recharts";
+
+type RangeMode = "today" | "week" | "month" | "custom";
 
 interface TeamMemberStats {
   id: string;
@@ -20,367 +33,311 @@ interface TeamMemberStats {
   completedDeals: number;
   appeals: number;
   checks: number;
+  lastActive: string;
 }
 
-const myStats = {
-  myDeals: 142,
-  completedDeals: 118,
-  cancelledDeals: 15,
-  appeals: 9,
-  checks: 234,
-  averageCheck: 127500,
-  growth: {
-    deals: 12,
-    checks: 8,
-    revenue: 15,
-  },
-};
+interface ActivityItem {
+  id: string;
+  user: string;
+  team: string;
+  action: string;
+  meta: string;
+  time: string;
+}
 
-const teamStats = {
-  myDeals: 487,
-  completedDeals: 423,
-  cancelledDeals: 38,
-  appeals: 26,
-  checks: 892,
-  averageCheck: 145000,
-  lastActivity: "2 минуты назад",
-};
+function MetricCard({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl border p-4"
+      style={{ borderColor: "var(--border)", background: "var(--card)" }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-extrabold mt-1">{value}</div>
+          {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+        </div>
+        <div className="h-10 w-10 rounded-xl flex items-center justify-center border"
+          style={{ borderColor: "var(--border)", background: "rgba(0,0,0,0.15)" }}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-const teamPerformance: TeamMemberStats[] = [
-  { id: "1", username: "@owner_user", totalDeals: 142, completedDeals: 118, appeals: 9, checks: 234 },
-  { id: "2", username: "@team_member1", totalDeals: 198, completedDeals: 176, appeals: 11, checks: 387 },
-  { id: "3", username: "@team_member2", totalDeals: 147, completedDeals: 129, appeals: 6, checks: 271 },
-];
+export default function Statistics() {
+  const [rangeMode, setRangeMode] = useState<RangeMode>("month");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
-export function Statistics() {
-  const [activeTab, setActiveTab] = useState<"me" | "team">("me");
-  const [period, setPeriod] = useState<"week" | "month" | "year">("month");
+  const [selectedMember, setSelectedMember] = useState<TeamMemberStats | null>(null);
 
-  const currentStats = activeTab === "me" ? myStats : teamStats;
+  // Mock stats (под будущий backend: /api/v1/statistics)
+  const myStats = {
+    deals: 142,
+    completed: 118,
+    cancelled: 15,
+    appeals: 9,
+    checks: 234,
+    avgCheck: 128000,
+  };
 
-  const periods = [
-    { id: "week", label: "Неделя" },
-    { id: "month", label: "Месяц" },
-    { id: "year", label: "Год" },
+  const teamStats = {
+    deals: 487,
+    completed: 423,
+    cancelled: 38,
+    appeals: 26,
+    checks: 892,
+    avgCheck: 145000,
+    lastActivity: "2 минуты назад",
+  };
+
+  const teamPerformance: TeamMemberStats[] = [
+    { id: "U-10001", username: "@owner_user", totalDeals: 142, completedDeals: 118, appeals: 9, checks: 234, lastActive: "2 мин назад" },
+    { id: "U-10002", username: "@team_member1", totalDeals: 185, completedDeals: 170, appeals: 7, checks: 361, lastActive: "12 мин назад" },
+    { id: "U-10003", username: "@team_member2", totalDeals: 160, completedDeals: 135, appeals: 10, checks: 297, lastActive: "1 ч назад" },
   ];
 
+  const activity: ActivityItem[] = [
+    { id: "a1", user: "@owner_user", team: "Арбитражники", action: "Проверка контрагента", meta: "UID 132465789 (HTX)", time: "2 мин назад" },
+    { id: "a2", user: "@team_member1", team: "Арбитражники", action: "Создал сделку", meta: "1500 USDT (ByBit)", time: "12 мин назад" },
+    { id: "a3", user: "@team_member2", team: "Арбитражники", action: "Закрыл сделку", meta: "2000 USDT (OKX)", time: "1 ч назад" },
+  ];
+
+  // Charts (под future TimescaleDB / analytics)
+  const chartData = useMemo(() => {
+    // In real API: backend returns points based on rangeMode/from/to
+    if (rangeMode === "today") {
+      return [
+        { label: "10:00", deals: 2, volume: 20 },
+        { label: "12:00", deals: 4, volume: 55 },
+        { label: "14:00", deals: 3, volume: 38 },
+        { label: "16:00", deals: 6, volume: 80 },
+        { label: "18:00", deals: 5, volume: 72 },
+      ];
+    }
+    const labels = rangeMode === "week"
+      ? ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+      : ["1", "5", "10", "15", "20", "25", "30"];
+
+    return labels.map((l, i) => ({
+      label: l,
+      deals: (i + 2) * (rangeMode === "week" ? 3 : 4),
+      volume: (i + 1) * (rangeMode === "week" ? 45 : 60),
+    }));
+  }, [rangeMode, from, to]);
+
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-black mb-1">Статистика</h2>
-        <p className="text-sm text-muted-foreground">
+    <div>
+      <div className="mb-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <BarChart3 className="w-4 h-4" />
           Анализ производительности и метрик
-        </p>
+        </div>
+
+        {/* Range selector (mobile-first) */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {[
+            { id: "today", label: "Сегодня" },
+            { id: "week", label: "Неделя" },
+            { id: "month", label: "Месяц" },
+            { id: "custom", label: "Интервал" },
+          ].map((x) => (
+            <button
+              key={x.id}
+              onClick={() => setRangeMode(x.id as RangeMode)}
+              className={[
+                "px-3 py-2 rounded-xl border text-sm whitespace-nowrap",
+                rangeMode === x.id
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                  : "bg-transparent text-foreground",
+              ].join(" ")}
+              style={{ borderColor: "var(--border)" }}
+            >
+              {x.label}
+            </button>
+          ))}
+        </div>
+
+        {rangeMode === "custom" && (
+          <div className="mt-3 flex gap-2">
+            <input
+              type="date"
+              className="flex-1 rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--card)" }}
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+            <input
+              type="date"
+              className="flex-1 rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--card)" }}
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Period Filter */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {periods.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriod(p.id as typeof period)}
-            className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all"
-            style={
-              period === p.id
-                ? {
-                    background: "var(--gradient-primary)",
-                    color: "#000",
-                    fontWeight: "bold",
-                  }
-                : {
-                    background: "var(--muted)",
-                    color: "var(--muted-foreground)",
-                  }
-            }
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="me">Моя статистика</TabsTrigger>
+      <Tabs defaultValue="my">
+        <TabsList className="w-full">
+          <TabsTrigger value="my">Моя статистика</TabsTrigger>
           <TabsTrigger value="team">Статистика команды</TabsTrigger>
         </TabsList>
 
-        {/* My Statistics */}
-        <TabsContent value="me" className="space-y-4">
-          {/* Main Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 className="w-5 h-5 text-[var(--info)]" />
-                <p className="text-xs text-muted-foreground">Мои сделки</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black mb-1">{currentStats.myDeals}</p>
-              <div className="flex items-center gap-1 text-xs text-[var(--success)]">
-                <TrendingUp className="w-3 h-3" />
-                <span>+{myStats.growth.deals}%</span>
-              </div>
-            </div>
+        <TabsContent value="my">
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <MetricCard icon={<Eye className="w-5 h-5" />} label="Проверки" value={String(myStats.checks)} sub="за выбранный период" />
+            <MetricCard icon={<Users className="w-5 h-5" />} label="Мои сделки" value={String(myStats.deals)} />
+            <MetricCard icon={<CheckCircle className="w-5 h-5 text-[var(--success)]" />} label="Завершенные" value={String(myStats.completed)} />
+            <MetricCard icon={<XCircle className="w-5 h-5 text-[var(--destructive)]" />} label="Отмененные" value={String(myStats.cancelled)} />
+            <MetricCard icon={<AlertTriangle className="w-5 h-5 text-[var(--warning)]" />} label="Апелляции" value={String(myStats.appeals)} />
+            <MetricCard icon={<DollarSign className="w-5 h-5 text-[var(--success)]" />} label="Средний чек" value={`${Math.round(myStats.avgCheck / 1000)}K ₽`} />
+          </div>
 
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-5 h-5 text-[var(--success)]" />
-                <p className="text-xs text-muted-foreground">Завершённые</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{currentStats.completedDeals}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {((currentStats.completedDeals / currentStats.myDeals) * 100).toFixed(1)}% успеха
-              </p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <XCircle className="w-5 h-5 text-[var(--destructive)]" />
-                <p className="text-xs text-muted-foreground">Отменённые</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{currentStats.cancelledDeals}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {((currentStats.cancelledDeals / currentStats.myDeals) * 100).toFixed(1)}%
-              </p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-[var(--warning)]" />
-                <p className="text-xs text-muted-foreground">Апелляции</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{currentStats.appeals}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {((currentStats.appeals / currentStats.myDeals) * 100).toFixed(1)}%
-              </p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Eye className="w-5 h-5 text-[var(--color-primary)]" />
-                <p className="text-xs text-muted-foreground">Проверки</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{currentStats.checks}</p>
-              <div className="flex items-center gap-1 text-xs text-[var(--success)]">
-                <TrendingUp className="w-3 h-3" />
-                <span>+{myStats.growth.checks}%</span>
-              </div>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-5 h-5 text-[var(--success)]" />
-                <p className="text-xs text-muted-foreground">Средний чек</p>
-              </div>
-              <p className="text-xl md:text-2xl font-black">
-                {(currentStats.averageCheck / 1000).toFixed(0)}K ₽
-              </p>
-              <div className="flex items-center gap-1 text-xs text-[var(--success)]">
-                <TrendingUp className="w-3 h-3" />
-                <span>+{myStats.growth.revenue}%</span>
-              </div>
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+            <div className="font-semibold mb-2">Динамика сделок</div>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="deals" strokeWidth={3} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Charts Placeholder */}
-          <div
-            className="backdrop-blur-xl rounded-xl p-6 border"
-            style={{
-              background: "var(--glass-bg)",
-              borderColor: "var(--glass-border)",
-            }}
-          >
-            <h3 className="text-lg font-bold mb-4">Динамика за {period === "week" ? "неделю" : period === "month" ? "месяц" : "год"}</h3>
-            <div className="h-48 flex items-center justify-center border border-dashed rounded-xl" style={{ borderColor: "var(--border)" }}>
-              <p className="text-muted-foreground">График сделок</p>
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+            <div className="font-semibold mb-2">Объёмы</div>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="volume" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </TabsContent>
 
-        {/* Team Statistics */}
-        <TabsContent value="team" className="space-y-4">
-          {/* Team Main Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 className="w-5 h-5 text-[var(--info)]" />
-                <p className="text-xs text-muted-foreground">Все сделки</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{teamStats.myDeals}</p>
-            </div>
+        <TabsContent value="team">
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <MetricCard icon={<Users className="w-5 h-5" />} label="Сделки команды" value={String(teamStats.deals)} sub={`Последняя активность: ${teamStats.lastActivity}`} />
+            <MetricCard icon={<Eye className="w-5 h-5" />} label="Проверки" value={String(teamStats.checks)} />
+            <MetricCard icon={<CheckCircle className="w-5 h-5 text-[var(--success)]" />} label="Завершенные" value={String(teamStats.completed)} />
+            <MetricCard icon={<XCircle className="w-5 h-5 text-[var(--destructive)]" />} label="Отмененные" value={String(teamStats.cancelled)} />
+            <MetricCard icon={<AlertTriangle className="w-5 h-5 text-[var(--warning)]" />} label="Апелляции" value={String(teamStats.appeals)} />
+            <MetricCard icon={<DollarSign className="w-5 h-5 text-[var(--success)]" />} label="Средний чек" value={`${Math.round(teamStats.avgCheck / 1000)}K ₽`} />
+          </div>
 
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-5 h-5 text-[var(--success)]" />
-                <p className="text-xs text-muted-foreground">Завершённые</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{teamStats.completedDeals}</p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <XCircle className="w-5 h-5 text-[var(--destructive)]" />
-                <p className="text-xs text-muted-foreground">Отменённые</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{teamStats.cancelledDeals}</p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-[var(--warning)]" />
-                <p className="text-xs text-muted-foreground">Апелляции</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{teamStats.appeals}</p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Eye className="w-5 h-5 text-[var(--color-primary)]" />
-                <p className="text-xs text-muted-foreground">Проверки</p>
-              </div>
-              <p className="text-2xl md:text-3xl font-black">{teamStats.checks}</p>
-            </div>
-
-            <div
-              className="backdrop-blur-xl rounded-xl p-4 border"
-              style={{
-                background: "var(--glass-bg)",
-                borderColor: "var(--glass-border)",
-              }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-5 h-5 text-[var(--success)]" />
-                <p className="text-xs text-muted-foreground">Средний чек</p>
-              </div>
-              <p className="text-xl md:text-2xl font-black">
-                {(teamStats.averageCheck / 1000).toFixed(0)}K ₽
-              </p>
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+            <div className="font-semibold mb-2">Динамика команды</div>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData.map((p) => ({ ...p, deals: Math.round(p.deals * 2.6) }))}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="deals" strokeWidth={3} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Last Activity */}
-          <div
-            className="backdrop-blur-xl rounded-xl p-4 border flex items-center justify-between"
-            style={{
-              background: "var(--gradient-card)",
-              borderColor: "var(--glass-border)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-[var(--color-primary)]" />
-              <div>
-                <p className="text-sm font-bold">Последняя активность</p>
-                <p className="text-xs text-muted-foreground">{teamStats.lastActivity}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Team Performance */}
-          <div
-            className="backdrop-blur-xl rounded-xl p-4 md:p-6 border"
-            style={{
-              background: "var(--glass-bg)",
-              borderColor: "var(--glass-border)",
-            }}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <Users className="w-5 h-5 text-[var(--color-primary)]" />
-              <h3 className="text-lg font-bold">Производительность команды</h3>
-            </div>
-
-            <div className="space-y-3">
-              <div className="grid grid-cols-5 gap-2 text-xs font-bold text-muted-foreground pb-2 border-b" style={{ borderColor: "var(--border)" }}>
-                <div className="col-span-1">Ник</div>
-                <div className="text-center">Сделок</div>
-                <div className="text-center">Завершено</div>
-                <div className="text-center">Апелляций</div>
-                <div className="text-center">Проверок</div>
-              </div>
-
-              {teamPerformance.map((member) => (
-                <div
-                  key={member.id}
-                  className="grid grid-cols-5 gap-2 text-sm items-center p-3 rounded-xl hover:bg-[var(--muted)] transition-colors"
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+            <div className="font-semibold mb-3">Производительность команды</div>
+            <div className="space-y-2">
+              {teamPerformance.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMember(m)}
+                  className="w-full text-left rounded-xl border p-3 flex items-center justify-between gap-3"
+                  style={{ borderColor: "var(--border)", background: "rgba(0,0,0,0.12)" }}
                 >
-                  <div className="col-span-1 font-bold text-[var(--color-primary)] truncate">
-                    {member.username}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-white truncate">{m.username}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      ID: {m.id} • активность: {m.lastActive}
+                    </div>
                   </div>
-                  <div className="text-center font-bold">{member.totalDeals}</div>
-                  <div className="text-center text-[var(--success)]">{member.completedDeals}</div>
-                  <div className="text-center text-[var(--warning)]">{member.appeals}</div>
-                  <div className="text-center">{member.checks}</div>
+                  <div className="text-xs text-muted-foreground shrink-0">
+                    {m.completedDeals}/{m.totalDeals} • ап: {m.appeals}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              Нажми на участника, чтобы увидеть детали.
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+            <div className="font-semibold mb-3">Последняя активность</div>
+            <div className="space-y-3">
+              {activity.map((x) => (
+                <div key={x.id} className="text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold">
+                      <span className="text-[var(--color-primary)]">{x.user}</span>{" "}
+                      <span className="text-muted-foreground">• {x.team}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{x.time}</div>
+                  </div>
+                  <div className="mt-1 text-foreground">{x.action}</div>
+                  <div className="text-xs text-muted-foreground">{x.meta}</div>
                 </div>
               ))}
             </div>
           </div>
         </TabsContent>
       </Tabs>
+
+      <Drawer open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Статистика участника</DrawerTitle>
+          </DrawerHeader>
+          {selectedMember && (
+            <div className="px-4 pb-6 space-y-3">
+              <div className="rounded-2xl border p-4" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+                <div className="text-lg font-extrabold">{selectedMember.username}</div>
+                <div className="text-xs text-muted-foreground">ID: {selectedMember.id}</div>
+                <div className="text-xs text-muted-foreground">Последняя активность: {selectedMember.lastActive}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <MetricCard icon={<Users className="w-5 h-5" />} label="Всего сделок" value={String(selectedMember.totalDeals)} />
+                <MetricCard icon={<CheckCircle className="w-5 h-5 text-[var(--success)]" />} label="Завершено" value={String(selectedMember.completedDeals)} />
+                <MetricCard icon={<AlertTriangle className="w-5 h-5 text-[var(--warning)]" />} label="Апелляции" value={String(selectedMember.appeals)} />
+                <MetricCard icon={<Eye className="w-5 h-5" />} label="Проверки" value={String(selectedMember.checks)} />
+              </div>
+
+              <Button onClick={() => setSelectedMember(null)} variant="outline" className="w-full">
+                Закрыть
+              </Button>
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
-
-export default Statistics;
