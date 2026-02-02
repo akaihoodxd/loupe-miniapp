@@ -357,7 +357,7 @@ export function Team() {
                           : "var(--muted)",
                       }}
                     >
-                      {msg.isPinned && (
+                      {msg.isPinned && msg.isPinned !== null ? (
                         
                       )}
                       
@@ -405,7 +405,7 @@ export function Team() {
                               Редактировать
                             </DropdownMenuItem>
 
-                            {msg.isPinned && (
+                            {msg.isPinned && msg.isPinned !== null ? (
                               
                             )}
 
